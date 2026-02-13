@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+stockfish/*.exe
+pc_capture/debug/
+pc_capture/calibration.json

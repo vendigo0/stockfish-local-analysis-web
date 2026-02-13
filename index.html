@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Local Chess Analysis</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0f1a;
+        --panel: rgba(18, 24, 40, 0.7);
+        --panel-strong: rgba(18, 24, 40, 0.9);
+        --text: #e6e9f2;
+        --muted: #9aa4b2;
+        --accent: #5cc8ff;
+        --accent-2: #9b7bff;
+        --good: #c8ff88;
+        --warn: #ffb86b;
+        --danger: #ff6b6b;
+        --shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        --glass: blur(18px) saturate(140%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, #1b2340 0%, #0b0f1a 55%);
+        color: var(--text);
+        font-family: "Inter", system-ui, -apple-system, sans-serif;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        padding: 32px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .title {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .title h1 {
+        margin: 0;
+        font-size: 24px;
+        letter-spacing: -0.02em;
+        font-weight: 600;
+      }
+
+      .title span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .control-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 8px 12px;
+        border-radius: 12px;
+        backdrop-filter: var(--glass);
+      }
+
+      .control-group label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+
+      .toggle input {
+        appearance: none;
+        width: 40px;
+        height: 22px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        position: relative;
+        outline: none;
+        transition: background 0.2s ease;
+      }
+
+      .toggle input::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        width: 16px;
+        height: 16px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s ease;
+      }
+
+      .toggle input:checked {
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+      }
+
+      .toggle input:checked::after {
+        transform: translateX(17px);
+      }
+
+      .button {
+        background: linear-gradient(135deg, rgba(92, 200, 255, 0.2), rgba(155, 123, 255, 0.2));
+        color: var(--text);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 10px 16px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgba(92, 200, 255, 0.2);
+        border-color: rgba(92, 200, 255, 0.4);
+      }
+
+      .button.secondary {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+
+      .button.secondary:hover {
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+      }
+
+      .layout {
+        flex: 1;
+        display: grid;
+        grid-template-columns: minmax(280px, 1fr) auto minmax(260px, 1fr);
+        gap: 28px;
+        align-items: center;
+      }
+
+      .panel {
+        background: var(--panel);
+        border-radius: 20px;
+        padding: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow: var(--shadow);
+        backdrop-filter: var(--glass);
+      }
+
+      .board-wrap {
+        position: relative;
+        width: min(72vw, 560px);
+        aspect-ratio: 1 / 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #board {
+        width: 100%;
+        height: 100%;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      #arrow-layer {
+        width: 100%;
+        height: 100%;
+      }
+
+      .evaluation {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .eval-bar {
+        position: relative;
+        width: 36px;
+        height: 420px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .eval-fill {
+        position: absolute;
+        bottom: 50%;
+        left: 0;
+        width: 100%;
+        height: 0%;
+        background: linear-gradient(180deg, #ffffff 0%, #dfe6f1 45%, #171a21 100%);
+        transition: height 0.5s ease, bottom 0.5s ease;
+      }
+
+      .eval-score {
+        text-align: center;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .analysis {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .analysis h3 {
+        margin: 0;
+        font-size: 15px;
+        color: var(--muted);
+      }
+
+      .line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        background: var(--panel-strong);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .line strong {
+        font-size: 14px;
+      }
+
+      .line span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .moves {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .status {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .status strong {
+        color: var(--text);
+      }
+
+      .square-highlight {
+        box-shadow: inset 0 0 0 3px rgba(92, 200, 255, 0.8);
+      }
+
+      .square-highlight.secondary {
+        box-shadow: inset 0 0 0 3px rgba(155, 123, 255, 0.6);
+      }
+
+      .promotion-modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(6, 8, 12, 0.7);
+        z-index: 30;
+      }
+
+      .promotion-modal.active {
+        display: flex;
+      }
+
+      .promotion-card {
+        background: var(--panel-strong);
+        border-radius: 18px;
+        padding: 20px;
+        display: grid;
+        gap: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: var(--shadow);
+      }
+
+      .promotion-card h4 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .promotion-options {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+
+      .promotion-options button {
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+        font-size: 14px;
+        cursor: pointer;
+        transition: transform 0.2s ease, border 0.2s ease;
+      }
+
+      .promotion-options button:hover {
+        transform: translateY(-1px);
+        border-color: rgba(92, 200, 255, 0.4);
+      }
+
+      input[type="range"] {
+        accent-color: var(--accent);
+      }
+
+      .depth-value {
+        font-size: 12px;
+        color: var(--muted);
+        min-width: 24px;
+        text-align: center;
+      }
+
+      @media (max-width: 1080px) {
+        .layout {
+          grid-template-columns: 1fr;
+          justify-items: center;
+        }
+
+        .evaluation {
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+        }
+
+        .eval-bar {
+          height: 260px;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .app {
+          padding: 20px;
+        }
+
+        .board-wrap {
+          width: min(92vw, 520px);
+        }
+
+        header {
+          flex-direction: column;
+          gap: 16px;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="title">
+          <h1>Local Chess Analysis</h1>
+          <span>Stockfish-powered analysis · MultiPV 3 · No backend required</span>
+        </div>
+        <div class="controls">
+          <div class="control-group">
+            <label for="depth">Depth</label>
+            <input id="depth" type="range" min="12" max="20" value="16" />
+            <span class="depth-value" id="depthValue">16</span>
+          </div>
+          <div class="control-group">
+            <label class="toggle">
+              <input id="accuracyToggle" type="checkbox" />
+              Accuracy
+            </label>
+            <input id="accuracy" type="range" min="0" max="100" value="70" />
+            <span class="depth-value" id="accuracyValue">70</span>
+          </div>
+          <div class="control-group">
+            <label for="skill">Skill</label>
+            <input id="skill" type="range" min="0" max="20" value="20" />
+            <span class="depth-value" id="skillValue">20</span>
+          </div>
+          <div class="control-group">
+            <label class="toggle">
+              <input id="limitStrength" type="checkbox" />
+              Limit ELO
+            </label>
+            <input id="elo" type="range" min="800" max="2850" value="2000" />
+            <span class="depth-value" id="eloValue">2000</span>
+          </div>
+          <div class="control-group">
+            <label for="style">Style</label>
+            <select id="style">
+              <option value="passive">Passive</option>
+              <option value="normal" selected>Normal</option>
+              <option value="aggressive">Aggressive</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label class="toggle">
+              <input id="humanization" type="checkbox" />
+              Humanization
+            </label>
+            <input id="humanLevel" type="range" min="0" max="100" value="35" />
+            <span class="depth-value" id="humanLevelValue">35</span>
+          </div>
+          <div class="control-group">
+            <label for="humanMode">Human mode</label>
+            <select id="humanMode">
+              <option value="dont_blunder">Don't blunder</option>
+              <option value="natural" selected>Natural mistakes</option>
+              <option value="chaotic">Chaotic</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="preset">Preset</label>
+            <select id="preset">
+              <option value="custom" selected>Custom</option>
+              <option value="coach">Coach</option>
+              <option value="blitz_human">Blitz Human</option>
+              <option value="tournament_human">Tournament Human</option>
+              <option value="engine_max">Engine Max</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label class="toggle">
+              <input id="toggleArrows" type="checkbox" checked />
+              Show arrows
+            </label>
+          </div>
+          <button class="button secondary" id="flipBoard">Flip</button>
+          <button class="button" id="undoMove">Step back</button>
+          <button class="button secondary" id="resetBoard">Reset</button>
+        </div>
+      </header>
+
+      <section class="layout">
+        <div class="panel evaluation">
+          <div class="eval-bar">
+            <div class="eval-fill" id="evalFill"></div>
+          </div>
+          <div class="eval-score" id="evalScore">0.0</div>
+        </div>
+
+        <div class="board-wrap">
+          <div id="board"></div>
+          <div class="overlay">
+            <svg id="arrow-layer"></svg>
+          </div>
+        </div>
+
+        <div class="panel analysis">
+          <h3>Engine Lines</h3>
+          <div class="moves" id="lines">
+            <div class="line">
+              <strong>Waiting...</strong>
+              <span>--</span>
+            </div>
+          </div>
+          <div class="status">
+            <div>
+              <strong>Best move:</strong> <span id="bestMove">--</span>
+            </div>
+            <div>
+              <strong>Evaluation:</strong> <span id="bestEval">0.0</span>
+            </div>
+            <div>
+              <strong>Accuracy:</strong> <span id="accuracyStatus">Manual</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="promotion-modal" id="promotionModal">
+      <div class="promotion-card">
+        <h4>Select promotion</h4>
+        <div class="promotion-options">
+          <button data-piece="q">Queen</button>
+          <button data-piece="r">Rook</button>
+          <button data-piece="b">Bishop</button>
+          <button data-piece="n">Knight</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.1/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+
+    <script>
+      // === Helpers ===
+      const files = "abcdefgh";
+      const evalCap = 1200;
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+      const debounce = (fn, delay) => {
+        let timer;
+        return (...args) => {
+          clearTimeout(timer);
+          timer = setTimeout(() => fn(...args), delay);
+        };
+      };
+
+      const uciToSan = (fen, move) => {
+        if (!move) return "--";
+        const temp = new Chess(fen);
+        const from = move.substring(0, 2);
+        const to = move.substring(2, 4);
+        const promotion = move.substring(4, 5);
+        const result = temp.move({ from, to, promotion: promotion || undefined });
+        return result ? result.san : move;
+      };
+
+      const evalToDisplay = (score) => {
+        if (score.type === "mate") {
+          return score.value > 0 ? `#${score.value}` : `#-${Math.abs(score.value)}`;
+        }
+        const cp = score.value / 100;
+        const signed = cp >= 0 ? `+${cp.toFixed(2)}` : cp.toFixed(2);
+        return signed;
+      };
+
+      const evalToPercent = (score) => {
+        let cp = score.type === "mate" ? (score.value > 0 ? evalCap : -evalCap) : score.value;
+        cp = clamp(cp, -evalCap, evalCap);
+        return ((cp + evalCap) / (2 * evalCap)) * 100;
+      };
+
+      const pieceTheme = (piece) => {
+        const color = piece[0];
+        const type = piece[1].toLowerCase();
+        return `imgs/${color}${type}.png`;
+      };
+
+      // === Board Setup ===
+      const game = new Chess();
+      let board = null;
+      let pendingPromotion = null;
+      let currentOrientation = "white";
+
+      const boardConfig = {
+        position: "start",
+        draggable: true,
+        pieceTheme,
+        onDragStart: (source, piece) => {
+          if (game.game_over()) return false;
+          const turn = game.turn();
+          if ((turn === "w" && piece.startsWith("b")) || (turn === "b" && piece.startsWith("w"))) {
+            return false;
+          }
+          return true;
+        },
+        onDrop: (source, target) => {
+          const moves = game.moves({ verbose: true });
+          const promotionMoves = moves.filter(
+            (move) => move.from === source && move.to === target && move.promotion
+          );
+
+          if (promotionMoves.length) {
+            pendingPromotion = { from: source, to: target, color: game.turn() };
+            showPromotionModal();
+            return "snapback";
+          }
+
+          const move = game.move({ from: source, to: target, promotion: "q" });
+          if (!move) return "snapback";
+          syncBoard();
+          scheduleAnalysis();
+        },
+        onSnapEnd: () => {
+          board.position(game.fen());
+        },
+      };
+
+      // === Engine Setup ===
+      let latestEvaluation = { type: "cp", value: 0 };
+      let multiPvLines = [];
+      let analysisToken = 0;
+
+      // === UI ===
+      const evalFill = document.getElementById("evalFill");
+      const evalScore = document.getElementById("evalScore");
+      const bestMoveEl = document.getElementById("bestMove");
+      const bestEvalEl = document.getElementById("bestEval");
+      const accuracyStatus = document.getElementById("accuracyStatus");
+      const linesEl = document.getElementById("lines");
+      const depthInput = document.getElementById("depth");
+      const depthValue = document.getElementById("depthValue");
+      const accuracyToggle = document.getElementById("accuracyToggle");
+      const accuracyInput = document.getElementById("accuracy");
+      const accuracyValue = document.getElementById("accuracyValue");
+      const skillInput = document.getElementById("skill");
+      const skillValue = document.getElementById("skillValue");
+      const limitStrength = document.getElementById("limitStrength");
+      const eloInput = document.getElementById("elo");
+      const eloValue = document.getElementById("eloValue");
+      const styleSelect = document.getElementById("style");
+      const humanizationToggle = document.getElementById("humanization");
+      const humanLevelInput = document.getElementById("humanLevel");
+      const humanLevelValue = document.getElementById("humanLevelValue");
+      const humanModeSelect = document.getElementById("humanMode");
+      const presetSelect = document.getElementById("preset");
+      const toggleArrows = document.getElementById("toggleArrows");
+      const flipBoard = document.getElementById("flipBoard");
+      const undoMove = document.getElementById("undoMove");
+      const resetBoard = document.getElementById("resetBoard");
+      const arrowLayer = document.getElementById("arrow-layer");
+      const promotionModal = document.getElementById("promotionModal");
+
+      const setWaitingUI = (message = "Analyzing...") => {
+        linesEl.innerHTML = `
+          <div class="line">
+            <strong>${message}</strong>
+            <span>--</span>
+          </div>
+        `;
+      };
+
+      const applyPreset = (name) => {
+        const preset = String(name || "custom");
+        if (preset === "coach") {
+          accuracyToggle.checked = true;
+          accuracyInput.value = "45";
+          humanizationToggle.checked = true;
+          humanLevelInput.value = "55";
+          humanModeSelect.value = "dont_blunder";
+          styleSelect.value = "normal";
+          depthInput.value = "14";
+          skillInput.value = "12";
+          limitStrength.checked = true;
+          eloInput.value = "1400";
+        } else if (preset === "blitz_human") {
+          accuracyToggle.checked = true;
+          accuracyInput.value = "65";
+          humanizationToggle.checked = true;
+          humanLevelInput.value = "40";
+          humanModeSelect.value = "natural";
+          styleSelect.value = "aggressive";
+          depthInput.value = "15";
+          skillInput.value = "15";
+          limitStrength.checked = true;
+          eloInput.value = "1800";
+        } else if (preset === "tournament_human") {
+          accuracyToggle.checked = true;
+          accuracyInput.value = "82";
+          humanizationToggle.checked = true;
+          humanLevelInput.value = "22";
+          humanModeSelect.value = "natural";
+          styleSelect.value = "normal";
+          depthInput.value = "17";
+          skillInput.value = "18";
+          limitStrength.checked = true;
+          eloInput.value = "2200";
+        } else if (preset === "engine_max") {
+          accuracyToggle.checked = false;
+          humanizationToggle.checked = false;
+          humanModeSelect.value = "natural";
+          styleSelect.value = "normal";
+          depthInput.value = "20";
+          skillInput.value = "20";
+          limitStrength.checked = false;
+          eloInput.value = "2850";
+        }
+
+        depthValue.textContent = depthInput.value;
+        accuracyValue.textContent = accuracyInput.value;
+        skillValue.textContent = skillInput.value;
+        eloValue.textContent = eloInput.value;
+        humanLevelValue.textContent = humanLevelInput.value;
+        humanLevelInput.disabled = !humanizationToggle.checked;
+        humanModeSelect.disabled = !humanizationToggle.checked;
+        humanLevelValue.style.opacity = humanizationToggle.checked ? "1" : "0.6";
+        syncStrengthUI();
+        updateAccuracyStatus(getAccuracySettings());
+      };
+
+      const getAccuracySettings = () => {
+        if (!accuracyToggle.checked) {
+          return {
+            depth: Number(depthInput.value),
+            skill: Number(skillInput.value),
+            limitStrength: limitStrength.checked,
+            elo: Number(eloInput.value),
+            accuracy: null,
+          };
+        }
+        const accuracy = clamp(Number(accuracyInput.value), 0, 100);
+        const depth = Math.max(4, Math.round(4 + (accuracy / 100) * 12));
+        const skill = Math.round((accuracy / 100) * 18);
+        return {
+          depth,
+          skill,
+          limitStrength: false,
+          elo: 2000,
+          accuracy,
+        };
+      };
+
+      const getHumanizationSettings = (settings) => {
+        if (settings && settings.accuracy !== null) {
+          // Low accuracy should actively allow inaccuracies.
+          return {
+            enabled: true,
+            level: clamp(100 - settings.accuracy, 0, 100),
+            mode: settings.accuracy <= 35 ? "chaotic" : "natural",
+          };
+        }
+        return {
+          enabled: humanizationToggle.checked,
+          level: Number(humanLevelInput.value),
+          mode: humanModeSelect.value,
+        };
+      };
+
+      const requestAnalysis = async () => {
+        const token = ++analysisToken;
+        multiPvLines = [];
+        setWaitingUI();
+        const settings = getAccuracySettings();
+        const human = getHumanizationSettings(settings);
+        updateAccuracyStatus(settings);
+        try {
+          const response = await fetch("/api/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fen: game.fen(),
+              depth: settings.depth,
+              multipv: human.enabled ? 8 : 3,
+              skill: settings.skill,
+              limitStrength: settings.limitStrength,
+              elo: settings.elo,
+              style: styleSelect.value,
+              humanization: human.enabled,
+              humanLevel: human.level,
+              humanMode: human.mode,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error("Engine error");
+          }
+          const data = await response.json();
+          if (token !== analysisToken) return;
+          multiPvLines = (data.lines || []).map((line) => ({
+            pv: line.pv || [],
+            score: line.score || { type: "cp", value: 0 },
+          }));
+          if (data.best) {
+            updateBestMove(data.best);
+          }
+          if (multiPvLines[0]) {
+            latestEvaluation = multiPvLines[0].score;
+            updateEvaluationUI();
+          }
+          updateLinesUI();
+          updateArrows();
+        } catch (error) {
+          if (token !== analysisToken) return;
+          setWaitingUI("Engine unavailable");
+          bestMoveEl.textContent = "--";
+          bestEvalEl.textContent = "0.0";
+        }
+      };
+
+      const showPromotionModal = () => {
+        promotionModal.classList.add("active");
+      };
+
+      const hidePromotionModal = () => {
+        promotionModal.classList.remove("active");
+      };
+
+      promotionModal.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-piece]");
+        if (!button || !pendingPromotion) return;
+        const piece = button.getAttribute("data-piece");
+        const move = game.move({
+          from: pendingPromotion.from,
+          to: pendingPromotion.to,
+          promotion: piece,
+        });
+        pendingPromotion = null;
+        hidePromotionModal();
+        if (!move) return;
+        syncBoard();
+        scheduleAnalysis();
+      });
+
+      depthInput.addEventListener("input", () => {
+        presetSelect.value = "custom";
+        depthValue.textContent = depthInput.value;
+        scheduleAnalysis();
+      });
+
+      accuracyInput.addEventListener("input", () => {
+        presetSelect.value = "custom";
+        accuracyValue.textContent = accuracyInput.value;
+        updateAccuracyStatus(getAccuracySettings());
+        scheduleAnalysis();
+      });
+
+      accuracyToggle.addEventListener("change", () => {
+        presetSelect.value = "custom";
+        syncStrengthUI();
+        updateAccuracyStatus(getAccuracySettings());
+        scheduleAnalysis();
+      });
+
+      skillInput.addEventListener("input", () => {
+        presetSelect.value = "custom";
+        skillValue.textContent = skillInput.value;
+        scheduleAnalysis();
+      });
+
+      const syncStrengthUI = () => {
+        const useAccuracy = accuracyToggle.checked;
+        const disabled = !limitStrength.checked;
+        depthInput.disabled = useAccuracy;
+        depthValue.style.opacity = useAccuracy ? "0.6" : "1";
+        skillInput.disabled = useAccuracy;
+        skillValue.style.opacity = useAccuracy ? "0.6" : "1";
+        limitStrength.disabled = useAccuracy;
+        eloInput.disabled = useAccuracy || disabled;
+        eloInput.style.opacity = useAccuracy || disabled ? "0.5" : "1";
+        eloValue.style.opacity = useAccuracy || disabled ? "0.6" : "1";
+      };
+
+      const updateAccuracyStatus = (settings) => {
+        const human = getHumanizationSettings(settings || getAccuracySettings());
+        const modeLabel =
+          human.mode === "dont_blunder"
+            ? "safe"
+            : human.mode === "chaotic"
+              ? "chaotic"
+              : "natural";
+        const humanText = human.enabled ? `Human ${human.level}% (${modeLabel})` : "Engine";
+        if (!settings || settings.accuracy === null) {
+          accuracyStatus.textContent = `Manual · ${humanText}`;
+          return;
+        }
+        accuracyStatus.textContent = `${settings.accuracy}% (D${settings.depth}/S${settings.skill}) · ${humanText}`;
+      };
+
+      limitStrength.addEventListener("change", () => {
+        presetSelect.value = "custom";
+        syncStrengthUI();
+        scheduleAnalysis();
+      });
+
+      eloInput.addEventListener("input", () => {
+        presetSelect.value = "custom";
+        eloValue.textContent = eloInput.value;
+        scheduleAnalysis();
+      });
+
+      humanLevelInput.addEventListener("input", () => {
+        presetSelect.value = "custom";
+        humanLevelValue.textContent = humanLevelInput.value;
+        updateAccuracyStatus(getAccuracySettings());
+        scheduleAnalysis();
+      });
+
+      humanizationToggle.addEventListener("change", () => {
+        presetSelect.value = "custom";
+        humanLevelInput.disabled = !humanizationToggle.checked;
+        humanModeSelect.disabled = !humanizationToggle.checked;
+        humanLevelValue.style.opacity = humanizationToggle.checked ? "1" : "0.6";
+        updateAccuracyStatus(getAccuracySettings());
+        scheduleAnalysis();
+      });
+
+      humanModeSelect.addEventListener("change", () => {
+        presetSelect.value = "custom";
+        updateAccuracyStatus(getAccuracySettings());
+        scheduleAnalysis();
+      });
+
+      styleSelect.addEventListener("change", () => {
+        presetSelect.value = "custom";
+        scheduleAnalysis();
+      });
+
+      presetSelect.addEventListener("change", () => {
+        applyPreset(presetSelect.value);
+        scheduleAnalysis();
+      });
+
+      toggleArrows.addEventListener("change", () => {
+        updateArrows();
+      });
+
+      flipBoard.addEventListener("click", () => {
+        currentOrientation = currentOrientation === "white" ? "black" : "white";
+        board.orientation(currentOrientation);
+        updateArrows();
+      });
+
+      undoMove.addEventListener("click", () => {
+        game.undo();
+        syncBoard();
+        scheduleAnalysis();
+      });
+
+      resetBoard.addEventListener("click", () => {
+        game.reset();
+        syncBoard();
+        scheduleAnalysis();
+      });
+
+      window.addEventListener("resize", () => updateArrows());
+
+      // === Analysis and Rendering ===
+      const scheduleAnalysis = debounce(() => {
+        requestAnalysis();
+      }, 200);
+
+      const updateEvaluationUI = () => {
+        const percent = evalToPercent(latestEvaluation);
+        const display = evalToDisplay(latestEvaluation);
+        evalScore.textContent = display;
+        bestEvalEl.textContent = display;
+        evalFill.style.height = `${Math.abs(percent - 50) * 2}%`;
+        evalFill.style.bottom = percent >= 50 ? "50%" : `${percent}%`;
+      };
+
+      const updateBestMove = (uciMove) => {
+        if (!uciMove) return;
+        const san = uciToSan(game.fen(), uciMove);
+        bestMoveEl.textContent = san;
+        updateArrows(uciMove);
+      };
+
+      const updateLinesUI = () => {
+        linesEl.innerHTML = "";
+        const items = multiPvLines.filter(Boolean);
+        if (!items.length) {
+          linesEl.innerHTML = `
+            <div class="line">
+              <strong>Waiting...</strong>
+              <span>--</span>
+            </div>
+          `;
+          return;
+        }
+
+        items.forEach((info) => {
+          const line = document.createElement("div");
+          line.className = "line";
+          const score = evalToDisplay(info.score);
+          const san = uciToSan(game.fen(), info.pv[0]);
+          line.innerHTML = `<strong>${san}</strong><span>${score}</span>`;
+          linesEl.appendChild(line);
+        });
+      };
+
+      const highlightSquares = (moves) => {
+        document.querySelectorAll(".square-highlight").forEach((sq) => {
+          sq.classList.remove("square-highlight", "secondary");
+        });
+        moves.forEach((move, index) => {
+          const from = document.querySelector(`.square-${move.from}`);
+          const to = document.querySelector(`.square-${move.to}`);
+          if (from) {
+            from.classList.add("square-highlight");
+            if (index > 0) from.classList.add("secondary");
+          }
+          if (to) {
+            to.classList.add("square-highlight");
+            if (index > 0) to.classList.add("secondary");
+          }
+        });
+      };
+
+      const updateArrows = (forcedBestMove) => {
+        arrowLayer.innerHTML = "";
+        if (!toggleArrows.checked) return;
+        const boardElement = document.getElementById("board");
+        const rect = boardElement.getBoundingClientRect();
+        arrowLayer.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+        arrowLayer.innerHTML = `
+          <defs>
+            <marker id="arrowHead" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(92, 200, 255, 0.9)"></path>
+            </marker>
+            <marker id="arrowHeadAlt" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(155, 123, 255, 0.7)"></path>
+            </marker>
+          </defs>
+        `;
+
+        const moves = [];
+        if (forcedBestMove) {
+          moves.push(forcedBestMove);
+        } else {
+          multiPvLines.forEach((info) => {
+            if (info && info.pv[0]) moves.push(info.pv[0]);
+          });
+        }
+
+        const arrowMoves = moves.slice(0, 3).map((uci) => ({
+          from: uci.substring(0, 2),
+          to: uci.substring(2, 4),
+        }));
+
+        highlightSquares(arrowMoves);
+
+        arrowMoves.forEach((move, index) => {
+          const from = squareCenter(move.from, rect);
+          const to = squareCenter(move.to, rect);
+          if (!from || !to) return;
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line.setAttribute("x1", from.x);
+          line.setAttribute("y1", from.y);
+          line.setAttribute("x2", to.x);
+          line.setAttribute("y2", to.y);
+          line.setAttribute("stroke", index === 0 ? "rgba(92, 200, 255, 0.9)" : "rgba(155, 123, 255, 0.7)");
+          line.setAttribute("stroke-width", index === 0 ? "8" : "6");
+          line.setAttribute("marker-end", index === 0 ? "url(#arrowHead)" : "url(#arrowHeadAlt)");
+          line.setAttribute("stroke-linecap", "round");
+          arrowLayer.appendChild(line);
+        });
+      };
+
+      const squareCenter = (square, rect) => {
+        if (!square) return null;
+        const file = files.indexOf(square[0]);
+        const rank = parseInt(square[1], 10) - 1;
+        const size = rect.width / 8;
+        const isWhite = currentOrientation === "white";
+        const x = (isWhite ? file : 7 - file) * size + size / 2;
+        const y = (isWhite ? 7 - rank : rank) * size + size / 2;
+        return { x, y };
+      };
+
+      const syncBoard = () => {
+        board.position(game.fen(), false);
+        updateArrows();
+      };
+
+      // === Boot ===
+      document.addEventListener("DOMContentLoaded", () => {
+        board = Chessboard("board", boardConfig);
+        depthValue.textContent = depthInput.value;
+        accuracyValue.textContent = accuracyInput.value;
+        skillValue.textContent = skillInput.value;
+        eloValue.textContent = eloInput.value;
+        humanLevelValue.textContent = humanLevelInput.value;
+        humanLevelInput.disabled = !humanizationToggle.checked;
+        humanModeSelect.disabled = !humanizationToggle.checked;
+        humanLevelValue.style.opacity = humanizationToggle.checked ? "1" : "0.6";
+        syncStrengthUI();
+        updateAccuracyStatus(getAccuracySettings());
+        updateEvaluationUI();
+        setWaitingUI("Ready");
+        applyPreset(presetSelect.value);
+        scheduleAnalysis();
+      });
+    </script>
+  </body>
+</html>
